@@ -203,6 +203,17 @@ class QuantTrader:
             print(f"[{datetime.now()}] 获取实时价格失败: {e}")
         return None
     
+    def get_mean_price(self, stock_code):
+        try:
+            quote = xtdata.get_full_tick([stock_code])
+            if quote and stock_code in quote:
+                mean = round((quote[stock_code]['amount'] / (quote[stock_code]['volume'] *100)),2) if quote[stock_code]['volume'] > 0 else 0
+                return mean
+        except Exception as e:
+            print(f"[{datetime.now()}] 获取均价失败: {e}")
+        return None
+ 
+
     #查询委托状态
     #输入：委托号
     #输出：委托状态

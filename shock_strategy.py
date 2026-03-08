@@ -9,9 +9,11 @@ import sqlite3
 import configparser
 from sqlalchemy import create_engine
 from DPTrader import *
+from DPData import *
 from ssOrders import *
 from loguru import logger
 from log_config import *
+from misc import *
 
 MODE_NORMAL = 0
 MODE_MONITOR= 1
@@ -28,10 +30,13 @@ ORDER_SELL = 2
 class Target: 
     def __init__(self):
         self.stock_code = ""
-        self.buy_step = 0.0
-        self.sell_step = 0.0
-        self.vol = 0
-        self.buy_times = 0
+        self.buy_step = 0.0         #买入价格阶梯，即当股票价格比上次买入价格低buy_step时，触发买入
+        self.sell_step = 0.0        #卖出价格阶梯，即当股票价格比上次卖入价格高sell_step时，触发卖出
+        self.vol = 0                #每次买入卖出的数量
+        self.buy_times = 0  
+        self.policy = 0             #标的遵循的策略ID
+        self.down_price = 0.0       #买入的地板价，即当股票价格比地板价低时，不再买入
+        self.up_price = 0.0         #卖出的天花板价，即当股票价格比天花板价高时，不再卖出
 
 
 QUERY_TRANSACTION = 'SELECT * FROM tansactions'
@@ -79,8 +84,18 @@ class ShockStrategy:
             target.buy_step = config.getfloat(sec, 'buy_step')
             target.sell_step = config.getfloat(sec, 'sell_step')
             target.vol = config.getint(sec, 'vol')
+            target.policy = config.getint(sec, 'policy') if config.has_option(sec, 'policy') else 0
             targets.append(target)
         return targets
+
+
+    def ReverseResponse(self): 
+        real_price = self.trader.get_realtime_price('131810.SZ')
+        position = self.trader.query_asset()
+        vol = int(position / 1000) * 10
+        fix_result_order_id = self.trader.sell('131810.SZ', real_price, vol,'逆回购申购')
+        logger.info(f"执行逆回购申购,股票代码:131810.SZ,交易ID:{fix_result_order_id},交易价格:{real_price},交易量:{vol},状态:申购中,备注:逆回购申购")
+
 
     #策略运行
     def Run(self):
@@ -113,7 +128,7 @@ class ShockStrategy:
         real_orders = self.trader.query_orders()
         if real_orders:
             for order in real_orders:
-                self.orders.Add(order.stock_code,ssOrder(str(order.order_id),order.order_type,order.stock_code,order.price,order.order_volume,order.order_status,order.order_remark))
+                self.orders.Add(order.stock_code,ssOrder(traderid2orderid(order.order_id),order.order_type,order.stock_code,order.price,order.order_volume,order.order_status,order.order_remark))
                                 
         order_time = 0 #买入交易次数
         print("###################自动交易开始，打印当前委托和交易情况：###################")
@@ -128,22 +143,24 @@ class ShockStrategy:
                         print(ro.order_id,ro.stock_code,ro.order_type,ro.price,ro.order_volume,ro.order_status,"|",ro.order_remark)
                 print("当前存在的已买入未卖出交易")
                 print(self.transactions)
-
+            
+            message_flag = 0
             while (msg := self.trader.pop_message()) != None:
+                message_flag = 1
                 if msg.msg_type == ORDER_MSG:
                     logger.info(f"委托推送,消息ID:{msg.msg_id},消息类型:{msg.order_type},股票代码:{msg.code},交易ID:{msg.order_id},交易价格:{msg.price},交易量:{msg.volume},状态:{msg.status},备注:{msg.remark}")
                     if msg.status == xtconstant.ORDER_REPORTED:
                         pass
                     if msg.status == xtconstant.ORDER_CANCELED:
-                        self.orders.Update_Status(msg.code,str(msg.order_id),msg.status,msg.order_type,msg.remark)
+                        self.orders.Update_Status(msg.code,traderid2orderid(msg.order_id),msg.status,msg.order_type,msg.remark)
                         logger.info(f"委托撤单,消息ID:{msg.msg_id},消息类型:{msg.order_type},股票代码:{msg.code},交易ID:{msg.order_id},交易价格:{msg.price},交易量:{msg.volume},状态:{msg.status},备注:{msg.remark}")
                 elif msg.msg_type == DONE_MSG:
                     logger.info(f"成交推送,消息ID:{msg.msg_id},消息类型:{msg.order_type},股票代码:{msg.code},交易ID:{msg.order_id},交易价格:{msg.price},交易量:{msg.volume},状态:{msg.status},备注:{msg.remark}")
-                    ret = self.orders.Update_Status(msg.code,str(msg.order_id),msg.status,msg.order_type,msg.remark)
+                    ret = self.orders.Update_Status(msg.code,traderid2orderid(msg.order_id),msg.status,msg.order_type,msg.remark)
                     logger.info(f"更新委托成交状态,消息ID:{msg.msg_id},消息类型:{msg.order_type},股票代码:{msg.code},交易ID:{msg.order_id},交易价格:{msg.price},交易量:{msg.volume},状态:{msg.status},备注:{msg.remark},状态更新返回:{ret}")
                     if ret > 0: #更新状态成功，则需要更新数据库
                         if msg.order_type == xtconstant.STOCK_BUY:
-                            self.transactions.loc[len(self.transactions)] = {'id':datetime.now().strftime("%Y%m%d") + str(msg.order_id),
+                            self.transactions.loc[len(self.transactions)] = {'id':traderid2orderid(msg.order_id),
                                                                                     'stock_code':msg.code,
                                                                                     'datetime':datetime.now().strftime("%Y%m%d%H%M%S"),
                                                                                     'order_type':'buy',
@@ -155,47 +172,52 @@ class ShockStrategy:
                         elif msg.order_type == xtconstant.STOCK_SELL:
                             trans_id = msg.remark
                             self.transactions.loc[self.transactions['id'] == trans_id,'status'] =  1 
+            
+            if message_flag == 1:
                 self.transactions.to_sql("tansactions", self.conn, if_exists='replace',index=False)
                 self.orders.Dump()
                          
             for target in self.targets:
                 real_price = self.trader.get_realtime_price(target.stock_code)
                 if real_price != None:
-                    #buy_flag,buy_price,sell_flag,sell_price,trans_id,buy_dec_id,sell_dec_id = self.orders.OrderDecision(target.stock_code,self.mode,real_price,target.buy_step,target.sell_step)
-                    od = self.orders.OrderDecision(target.stock_code,self.mode,real_price,target.buy_step,target.sell_step)
+                    od = self.orders.OrderDecision(target,self.mode,real_price,target.buy_step,target.sell_step)
                 if od.GetBuyDecision():# buy_flag and buy_price < 900:# and order_time < self.max_order:
                     if self.trader.query_asset() >= od.GetBuyPrice() * target.vol:
                         logger.info(f"执行买入股票：{target.stock_code},买入价格:{od.GetBuyPrice()},策略ID:{od.GetBuyDecisionId()}")
                         order_id = self.trader.buy(target.stock_code,od.GetBuyPrice(),target.vol)
                         if  order_id is not None:
-                            self.orders.Add(target.stock_code,ssOrder(str(order_id),xtconstant.STOCK_BUY,target.stock_code,od.GetBuyPrice(),target.vol,xtconstant.ORDER_REPORTED,""))
+                            self.orders.Add(target.stock_code,ssOrder(traderid2orderid(order_id),xtconstant.STOCK_BUY,target.stock_code,od.GetBuyPrice(),target.vol,xtconstant.ORDER_REPORTED,""))
                         order_time = order_time + 1
                 if  od.GetSellDecision():# sell_flag and sell_price < 900:
                     if self.trader.query_stock_position(target.stock_code,1) >= target.vol:
                         logger.info(f"执行卖出股票：{target.stock_code},卖出价格：{od.GetSellPrice()},策略ID:{od.GetSellDecisionId()}")
                         order_id = self.trader.sell(target.stock_code,od.GetSellPrice(),target.vol,str(od.GetTranId()))
                         if order_id is not None:
-                            self.orders.Add(target.stock_code,ssOrder(str(order_id),xtconstant.STOCK_SELL,target.stock_code,od.GetSellPrice(),target.vol,xtconstant.ORDER_REPORTED,od.GetTranId()))
+                            self.orders.Add(target.stock_code,ssOrder(traderid2orderid(order_id),xtconstant.STOCK_SELL,target.stock_code,od.GetSellPrice(),target.vol,xtconstant.ORDER_REPORTED,od.GetTranId()))
                 if od.GetSellCancelDecision():
-                    self.trader.cancel_order(int(od.GetMaxSellId()))
-                    logger.info(f"撤销卖出委托,股票代码:{target.stock_code},交易ID:{od.GetMaxSellId()}")
-                
-            if self.mode > MODE_NORMAL:
-                self.orders.Dump()
-            
+                    self.trader.cancel_order(orderid2traderid(od.GetSellCancelId()))
+                    logger.info(f"撤销卖出委托,股票代码:{target.stock_code},交易ID:{orderid2traderid(od.GetSellCancelId())}")
+                #if od.GetBuyCancelDecision():
+                #    self.trader.cancel_order(int(od.GetBuyCancelId()))
+                #    logger.info(f"撤销买入委托,股票代码:{target.stock_code},交易ID:{od.GetBuyCancelId()}")
+
             now = datetime.now()
-            if now.hour >= 14 and now.minute >= 50:
+            #if now.hour >= 14 and now.minute >= 50:
+            if now.hour * 60 + now.minute >= 890:
                 break
-            time.sleep(60)
+            time.sleep(10)
         #盘后处理
         logger.info(f"执行尾盘撤单")
         for target in self.targets:
             orders = self.orders.data[target.stock_code]
             for order in orders:
                 if order.order_type == xtconstant.STOCK_BUY and order.status == xtconstant.ORDER_REPORTED:
-                    self.trader.cancel_order(int(order.order_id))
-                    logger.info(f"盘后撤销未成交买入委托,股票代码:{order.stock_code},交易ID:{order.order_id},交易价格:{order.price},交易量:{order.volume},状态:{order.status},备注:{order.ref}")
+                    self.trader.cancel_order(orderid2traderid(order.order_id))
+                    logger.info(f"盘后撤销未成交买入委托,股票代码:{order.stock_code},交易ID:{orderid2traderid(order.order_id)},交易价格:{order.price},交易量:{order.volume},状态:{order.status},备注:{order.ref}")
        
+        #盘后购买逆回购
+        time.sleep(60)
+        self.ReverseResponse()
         self.orders.Dump()
 
 # 单例模式
@@ -228,12 +250,14 @@ def GetSetting():
 if __name__ == "__main__":
     # 配置参数（根据实际情况修改）
     setup_logger()
+    
     (mode,max_order,account_id,session_id,qmt) = GetSetting()
     QMT_PATH = qmt
     SESSION_ID = session_id#123456
     ACCOUNT_ID = account_id#
     print(f"[{datetime.now()}] 启动量化交易程序")
     trader = QuantTrader(QMT_PATH, SESSION_ID, ACCOUNT_ID)
+    data_source = QuantData()
     
     now = datetime.now()
     print(f"datetime方法 - 当前时间: {now.hour:02d}:{now.minute:02d}")
