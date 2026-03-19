@@ -210,7 +210,12 @@ class ssOrders:
                 if order.order_id == id and order.status != status: #and order.type == type and 
                     order.status = status
                     if order.order_type == xtconstant.STOCK_SELL:
-                        ret = self.Update_Status(code,ref,101 ,xtconstant.STOCK_BUY,"") - 1 
+                        if status == xtconstant.ORDER_SUCCEEDED:
+                            ret = self.Update_Status(code,ref,101 ,xtconstant.STOCK_BUY,"") - 1 
+                        if status == xtconstant.ORDER_CANCELED:
+                            ret = self.Update_Status(code,ref,xtconstant.ORDER_SUCCEEDED ,xtconstant.STOCK_BUY,"") - 1
+                        else:
+                            ret = status
                     else:
                         ret = status 
         return ret
@@ -267,12 +272,12 @@ class ssOrders:
                 od.SetBuyDecision(True, 2,buy_price)
                 logger.info(f"买入策略2：股票代码：{code},当前价格:{real_price},最高买入价：{pw.GetMaxBuy()},最低成交价:{pw.GetMinTran()}")
             #确定是否需要卖出,当最低买入交易未执行卖出，则执行卖出
-            if  pw.MinBuyStatusIsDone():#如果最小买入价格的股票的状态不是在卖就执行卖出操作== xtconstant.ORDER_SUCCEEDED : #如果买入价格最低的买入交易为委托卖出，则卖出标记为True
+            if  pw.MinBuyStatusIsDone() and pw.GetMinTran() - real_price < (sell_step * 2.2):#如果最小买入价格的股票的状态不是在卖就执行卖出操作== xtconstant.ORDER_SUCCEEDED : #如果买入价格最低的买入交易为委托卖出，则卖出标记为True
                 sell_price = round(real_price ,PRICE_PRECISION) if real_price > (pw.GetMinTran() + sell_step) else round(pw.GetMinTran() + sell_step,PRICE_PRECISION)
                 od.SetSellDecision(True, 3,sell_price)
                 logger.info(f"卖出策略：股票代码：{code},当前价格:{real_price},最低成交价:{pw.GetMinTran()},卖出价格:{sell_price}")
             #确定是否需要撤卖单，撤卖单的条件是，最高卖单价比当前价高2个sell_step
-            if  pw.GetMaxSell() - real_price > (sell_step * 2):
+            if  pw.GetMaxSell() - real_price > (sell_step * 2.5):
                 od.SetSellCancelDecision(True,pw.GetMaxSellId())
                 logger.info(f"撤销卖单策略：股票代码：{code},当前价格:{real_price},最高卖出价:{pw.GetMaxSell()}")
             #确定是否需要撤买单，撤买单的条件是，最低买单价比当前价低3个buy_step
