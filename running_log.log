@@ -1,2 +1,171 @@
 2026-03-16 13:18:15 卖出策略：股票代码：600050.SH,当前价格:5.04,最低成交价:4.87,卖出价格:5.04
 2026-03-16 13:18:15 执行卖出股票：600050.SH,卖出价格：5.04,策略ID:3
+2026-03-20 11:28:46 买入策略1：股票代码：600050.SH,当前价格:4.74,最低成交价:4.87,最低买入价:999
+2026-03-20 11:28:46 执行买入股票：600050.SH,买入价格:4.74,策略ID:1
+2026-03-20 11:29:16 买入策略2：股票代码：600050.SH,当前价格:4.74,最高买入价：0,最低成交价:4.74
+2026-03-20 11:29:16 卖出策略：股票代码：600050.SH,当前价格:4.74,最低成交价:4.74,卖出价格:4.76
+2026-03-20 11:29:16 执行买入股票：600050.SH,买入价格:4.72,策略ID:2
+2026-03-20 11:29:16 执行卖出股票：600050.SH,卖出价格：4.76,策略ID:3
+2026-03-20 11:35:11 卖出策略：股票代码：600050.SH,当前价格:4.74,最低成交价:4.74,卖出价格:4.76
+2026-03-20 11:35:11 执行卖出股票：600050.SH,卖出价格：4.76,策略ID:3
+2026-03-20 11:36:11 委托推送,消息ID:1773977711,消息类型:24,股票代码:600050.SH,交易ID:1209008134,交易价格:4.76,交易量:500,状态:50,备注:202603201209008131
+2026-04-03 14:06:32 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-03 14:07:03 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-03 14:07:30 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-03 14:12:46 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-03 14:13:46 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-03 14:14:46 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-03 14:15:46 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-03 14:16:46 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-03 14:17:46 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-03 14:18:46 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-03 14:19:46 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-03 14:20:46 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-03 14:21:46 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-03 14:22:46 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-03 14:23:46 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-03 14:24:46 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-03 14:25:46 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-03 14:26:46 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-04 21:07:35 策略守护进程已启动
+2026-04-04 21:07:35 RESTful服务已启动，监听端口6519
+2026-04-04 21:40:25 收到停止信号，正在停止策略...
+2026-04-04 21:40:25 策略未在运行
+2026-04-04 21:40:30 策略守护进程已启动
+2026-04-04 21:40:30 RESTful服务已启动，监听端口6519
+2026-04-04 21:40:47 删除目标股票: 600050.SH
+2026-04-06 10:41:10 收到停止信号，正在停止策略...
+2026-04-06 10:41:10 策略未在运行
+2026-04-06 10:41:22 策略守护进程已启动
+2026-04-06 10:41:22 RESTful服务已启动，监听端口6519
+2026-04-06 10:41:23 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 10:42:23 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 10:43:23 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 10:44:23 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 10:45:23 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 10:45:56 收到停止信号，正在停止策略...
+2026-04-06 10:46:14 策略守护进程已启动
+2026-04-06 10:46:14 RESTful服务已启动，监听端口6519
+2026-04-06 10:46:14 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 10:47:14 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 10:48:14 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 10:49:14 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 10:50:14 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 10:51:02 收到停止信号，正在停止策略...
+2026-04-06 10:51:12 策略守护进程已停止
+2026-04-06 10:54:11 策略守护进程已启动
+2026-04-06 10:54:11 RESTful服务已启动，监听端口6519
+2026-04-06 10:54:11 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 10:55:11 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 10:56:11 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 10:57:11 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 10:58:11 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 10:59:11 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:00:11 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:01:11 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:02:11 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:03:11 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:04:11 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:05:11 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:06:11 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:07:11 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:08:11 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:09:11 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:10:11 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:11:11 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:12:11 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:12:48 收到停止信号，正在停止策略...
+2026-04-06 11:12:58 策略守护进程已停止
+2026-04-06 11:13:03 策略守护进程已启动
+2026-04-06 11:13:03 RESTful服务已启动，监听端口6519
+2026-04-06 11:13:03 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:14:03 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:15:03 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:16:03 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:17:03 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:18:03 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:19:03 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:20:03 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:21:03 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:22:03 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:23:03 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:24:03 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:25:03 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:26:03 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:27:03 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:28:03 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:29:03 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:30:03 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:31:03 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:32:03 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:33:03 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:34:03 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:35:03 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:36:03 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:36:17 收到停止信号，正在停止策略...
+2026-04-06 11:36:31 策略守护进程已启动
+2026-04-06 11:36:31 RESTful服务已启动，监听端口6519
+2026-04-06 11:36:31 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:36:54 收到停止信号，正在停止策略...
+2026-04-06 11:37:04 策略守护进程已停止
+2026-04-06 11:37:15 策略守护进程已启动
+2026-04-06 11:37:15 RESTful服务已启动，监听端口6519
+2026-04-06 11:37:15 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:37:50 收到停止信号，正在停止策略...
+2026-04-06 11:38:00 策略守护进程已停止
+2026-04-06 11:38:31 策略守护进程已启动
+2026-04-06 11:38:31 RESTful服务已启动，监听端口6519
+2026-04-06 11:38:31 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:39:31 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:40:09 收到停止信号，正在停止策略...
+2026-04-06 11:40:19 策略守护进程已停止
+2026-04-06 11:40:24 策略守护进程已启动
+2026-04-06 11:40:24 RESTful服务已启动，监听端口6519
+2026-04-06 11:40:24 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:41:24 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:41:45 收到停止信号，正在停止策略...
+2026-04-06 11:41:55 策略守护进程已停止
+2026-04-06 11:42:00 策略守护进程已启动
+2026-04-06 11:42:00 RESTful服务已启动，监听端口6519
+2026-04-06 11:42:00 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:42:58 收到停止信号，正在停止策略...
+2026-04-06 11:43:00 策略守护进程已停止
+2026-04-06 11:43:05 策略守护进程已启动
+2026-04-06 11:43:05 RESTful服务已启动，监听端口6519
+2026-04-06 11:43:05 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:44:05 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:45:05 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:45:31 收到停止信号，正在停止策略...
+2026-04-06 11:45:41 策略守护进程已停止
+2026-04-06 11:45:46 策略守护进程已启动
+2026-04-06 11:45:46 RESTful服务已启动，监听端口6519
+2026-04-06 11:45:46 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:45:53 JSON序列化失败: Object of type int64 is not JSON serializable
+2026-04-06 11:46:17 收到停止信号，正在停止策略...
+2026-04-06 11:46:27 策略守护进程已停止
+2026-04-06 11:48:24 策略守护进程已启动
+2026-04-06 11:48:24 RESTful服务已启动，监听端口6519
+2026-04-06 11:48:24 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:48:36 收到停止信号，正在停止策略...
+2026-04-06 11:48:46 策略守护进程已停止
+2026-04-06 11:51:20 策略守护进程已启动
+2026-04-06 11:51:20 RESTful服务已启动，监听端口6519
+2026-04-06 11:51:20 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:52:20 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:53:20 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:54:20 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:55:20 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:56:20 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:57:05 收到停止信号，正在停止策略...
+2026-04-06 11:57:15 策略守护进程已停止
+2026-04-06 11:57:20 策略守护进程已启动
+2026-04-06 11:57:20 RESTful服务已启动，监听端口6519
+2026-04-06 11:57:20 运行过程中发生异常: QuantData.get_current_amount() missing 1 required positional argument: 'stock_code'
+2026-04-06 11:57:38 收到停止信号，正在停止策略...
+2026-04-06 11:57:48 策略守护进程已停止
+2026-04-06 12:00:06 策略守护进程已启动
+2026-04-06 12:00:06 RESTful服务已启动，监听端口6519
+2026-04-06 12:00:06 上证指数：3880.097, 上证指数涨跌幅：None, 上证指数开盘涨跌幅：0.0021, 上证指数当前价与开盘价的涨跌幅：None, 市场成交量：492699082, 市场成交金额：20939.67
+2026-04-06 12:00:06 买入策略1：股票代码：600050.SH,当前价格:4.46,最低成交价:4.87,最低买入价:999，买入系数:2
+2026-04-06 18:34:57 收到停止信号，正在停止策略...
+2026-04-06 18:34:57 策略未在运行

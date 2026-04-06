@@ -7,7 +7,6 @@ import pandas as pd
 from loguru import logger
 from DPData import *
 from misc import *
-from shock_strategy import Target
 
 PRICE_PRECISION = 3
 
@@ -84,6 +83,7 @@ class ssOderDecision:
         self.sell_cancel_decision = sell_cancel_decision
         self.buy_cancel_id = ""
         self.sell_cancel_id = ""
+        self.buy_coef = 1
 
     def SetBuyDecision(self,decision:bool, decision_id:int,price:float = 0):
         self.buy_decision = decision
@@ -119,8 +119,10 @@ class ssOderDecision:
     def SetMaxSellId(self,id:str):
         self.max_sell_id = id
 
+    def SetBuyCoef(self,coef:float):
+        self.buy_coef = coef
+
     def GetMaxSellId(self):
-        return self.max_sell_id
         return self.max_sell_id
 
     def GetBuyCancelId(self):
@@ -158,6 +160,36 @@ class ssOderDecision:
 
     def GetMaxSellId(self):
         return self.max_sell_id
+
+    def GetBuyCoef(self):
+        return self.buy_coef
+    
+
+
+#策略上下文，提供进行策略决策的上下文信息
+class Context:
+    def __init__(self,datasource:QuantData = None):
+        self.sh_index = 0           #上证指数
+        self.sh_ratio = 0           #上证指数涨跌幅
+        self.sh_open_ratio = 0      #上证指数开盘涨跌幅
+        self.sh_k_ratio = 0         #上证指数当前价与开盘价的涨跌幅
+        self.vol = 0                #市场成交量
+        self.amount = 0             #市场成交金额 
+        self.ds = datasource if datasource is not None else QuantData() #数据接口
+
+
+    def Update_Context(self):
+        self.sh_index = self.ds.get_realtime_price('000001.SH')
+        self.sh_ratio = self.ds.get_current_ratio('000001.SH')
+        self.sh_open_ratio = self.ds.get_open_ratio('000001.SH')
+        self.sh_k_ratio = self.ds.get_current_ratio('000001.SH')
+        self.vol = self.ds.get_current_volume('000001.SH')
+        self.amount = self.ds.get_current_amount()
+
+    
+    def Dump_Context(self):
+        logger.info(f"上证指数：{self.sh_index}, 上证指数涨跌幅：{self.sh_ratio}, 上证指数开盘涨跌幅：{self.sh_open_ratio}, 上证指数当前价与开盘价的涨跌幅：{self.sh_k_ratio}, 市场成交量：{self.vol}, 市场成交金额：{self.amount}")
+
 
 class ssOrder:
     def __init__(self,id:str, type:int, code:str, price:float, volume:int, status:int,ref:str=""):
@@ -197,7 +229,7 @@ class ssOrders:
     
     def Remove(self,code:str, id:str):
         orders = self.data[code]
-        if order is not None:
+        if orders is not None:
             for order in orders:
                 if order.order_id == id:
                     orders.remove(order)
@@ -236,13 +268,30 @@ class ssOrders:
                     return True
         return False
     
+
+    def ComputeBuyCofef(self,code:str, real_price:float, ma30:float)->int: #根据当前价格和30日均线价格来计算买入阶梯系数
+        if ma30 < 0:
+            return 1
+        
+        if (real_price - ma30)/real_price > 0.03: #如果当前价格高出30日均线超过3%，系数为-1，表示不买入
+            return -1
+        elif (real_price - ma30)/real_price < -0.03: #如果当前价格低于30日均线超过3%，加大买入阶梯系数，减少买入几率
+            return 2
+        else:
+            return 1
+
     #根据当前的委托情况和最新的价格来判断是否需要执行买入卖出操作，以及买入卖出的价格
-    def T_OrderDecision(self,code:str,mode:int, real_price:float,buy_step:float,sell_step:float): 
+    def T_OrderDecision(self,code:str,mode:int, real_price:float,buy_step:float,sell_step:float,ma30:float): 
         orders = self.data[code]
         pw = PriceWindows()
         od = ssOderDecision()
         buy_price = sell_price = 0
 
+        #确定买入系数
+        buy_coef = self.ComputeBuyCofef(code, real_price, ma30)
+        od.SetBuyCoef(buy_coef)
+        #print(f"Target:{code},买入系数:{buy_coef},当前价格:{real_price},30日均线价格:{ma30}")
+        
         if orders is not None:
             for order in orders:#确定价格窗口： 最小买入价格，最大买入价格，以及最小成交价格，根据这几个价格来确定是否买入和卖出
                 if order.order_type == xtconstant.STOCK_BUY and  order.status == xtconstant.ORDER_REPORTED and order.price < pw.GetMinBuy():
@@ -261,16 +310,18 @@ class ssOrders:
                 
             #|min_buy_price |-----|max_buy_price|-------|min_tran_price| 仅当real_price低于min_buy_price或者高于max_buy_price,且max_buy_price与min_tran_price之间有一定差距时，才执行买入卖出操作
             #确定是否需要买入，买入条件，仅当当前价低于最低一笔买入成交和买入委托时，才执行买入
-            if real_price < pw.GetMinTran() and real_price < pw.GetMinBuy(): #
-                mini_price = min(pw.GetMinBuy(), pw.GetMinTran())
-                buy_price = round(real_price,PRICE_PRECISION) if real_price < (mini_price - buy_step) else round(mini_price - buy_step,PRICE_PRECISION)
-                od.SetBuyDecision(True, 1,buy_price)
-                logger.info(f"买入策略1：股票代码：{code},当前价格:{real_price},最低成交价:{pw.GetMinTran() },最低买入价:{pw.GetMinBuy()}")
-            #当当前最高买入价与真实价格之差超过了2倍buy_step时，以当前价-buy_step价格作为买入价
-            elif (pw.GetMinTran() < 900) and ( real_price > pw.GetMaxBuy() ) and (pw.GetMinTran() -  pw.GetMaxBuy()) > (buy_step * 1.8): #如果当前价高于最高委托，且最高委托和最小成交价直接存在空洞
-                buy_price = round(pw.GetMaxBuy() +  buy_step,PRICE_PRECISION) if pw.GetMaxBuy() > 0 else round(pw.GetMinTran() -  buy_step,PRICE_PRECISION)
-                od.SetBuyDecision(True, 2,buy_price)
-                logger.info(f"买入策略2：股票代码：{code},当前价格:{real_price},最高买入价：{pw.GetMaxBuy()},最低成交价:{pw.GetMinTran()}")
+            if buy_coef > 0: #如果买入系数大于0，才执行买入操作
+                buy_step_adjusted = buy_step * buy_coef
+                if real_price < pw.GetMinTran() and real_price < pw.GetMinBuy(): #
+                    mini_price = min(pw.GetMinBuy(), pw.GetMinTran())
+                    buy_price = round(real_price,PRICE_PRECISION) if real_price < (mini_price - buy_step_adjusted) else round(mini_price - buy_step_adjusted,PRICE_PRECISION)
+                    od.SetBuyDecision(True, 1,buy_price)
+                    logger.info(f"买入策略1：股票代码：{code},当前价格:{real_price},最低成交价:{pw.GetMinTran() },最低买入价:{pw.GetMinBuy()}，买入系数:{buy_coef}")
+                #当当前最高买入价与真实价格之差超过了2倍buy_step时，以当前价-buy_step价格作为买入价
+                elif (pw.GetMinTran() < 900) and ( real_price > pw.GetMaxBuy() ) and (pw.GetMinTran() -  pw.GetMaxBuy()) > (buy_step * 1.8): #如果当前价高于最高委托，且最高委托和最小成交价直接存在空洞
+                    buy_price = round(pw.GetMaxBuy() +  buy_step,PRICE_PRECISION) if pw.GetMaxBuy() > 0 else round(pw.GetMinTran() -  buy_step,PRICE_PRECISION)
+                    od.SetBuyDecision(True, 2,buy_price)
+                    logger.info(f"买入策略2：股票代码：{code},当前价格:{real_price},最高买入价：{pw.GetMaxBuy()},最低成交价:{pw.GetMinTran()}")
             #确定是否需要卖出,当最低买入交易未执行卖出，则执行卖出
             if  pw.MinBuyStatusIsDone() and pw.GetMinTran() - real_price < (sell_step * 2.2):#如果最小买入价格的股票的状态不是在卖就执行卖出操作== xtconstant.ORDER_SUCCEEDED : #如果买入价格最低的买入交易为委托卖出，则卖出标记为True
                 sell_price = round(real_price ,PRICE_PRECISION) if real_price > (pw.GetMinTran() + sell_step) else round(pw.GetMinTran() + sell_step,PRICE_PRECISION)
@@ -332,10 +383,10 @@ class ssOrders:
         return od
 
 
-    def OrderDecision(self, target:Target,mode:int, real_price:float,buy_step:float,sell_step:float): #判断是否需要执行新的买入卖出交易，以及交易价格是多少
+    def OrderDecision(self, target,mode:int, real_price:float,buy_step:float,sell_step:float): #判断是否需要执行新的买入卖出交易，以及交易价格是多少
         if target.policy == 0:
             #print(f"执行T_OrderDecision策略，股票代码：{target.stock_code},当前价格:{real_price}")
-            return self.T_OrderDecision(target.stock_code,mode, real_price,buy_step,sell_step)
+            return self.T_OrderDecision(target.stock_code,mode, real_price,buy_step,sell_step,target.ma30)
         if target.policy == 1:
             return self.MeanPrice_OrderDecision(target.stock_code,mode, buy_step,sell_step)
 

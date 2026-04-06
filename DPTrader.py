@@ -78,7 +78,7 @@ class DPXtQuantTraderCallback(XtQuantTraderCallback):
         #log_str = "成交变动推送,账户ID:{},成交股票代码:{},委托ID:{}".format(trade.account_id, trade.stock_code, trade.order_id)
         #self.log(log_str)
         self.push_message(DPMessage(str(int(datetime.now().timestamp())),DONE_MSG,trade.order_type,trade.stock_code,str(trade.order_id),trade.traded_price,trade.traded_volume,xtconstant.ORDER_SUCCEEDED,trade.order_remark) )
-        print("on trade callback")
+        #print("on trade callback")
         #print(trade.account_id, trade.stock_code, trade.order_id)
     
     def on_stock_position(self, position):
@@ -89,7 +89,7 @@ class DPXtQuantTraderCallback(XtQuantTraderCallback):
         """
         #log_str = "持仓变动推送,股票代码:{},持仓量:{}".format(position.stock_code, position.volume)
         #self.log(log_str)
-        print("on position callback")
+        #print("on position callback")
         #print(position.stock_code, position.volume)
     
     def on_order_error(self, order_error):
