@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Shock Strategy Dashboard</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Element Plus CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.5.6/dist/index.css">
+    <!-- Vue 3 -->
+    <script src="https://cdn.jsdelivr.net/npm/vue@3.4.21/dist/vue.global.min.js"></script>
+    <!-- Element Plus JS -->
+    <script src="https://cdn.jsdelivr.net/npm/element-plus@2.5.6/dist/index.full.min.js"></script>
+    <!-- Axios -->
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.8/dist/axios.min.js"></script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script>
+      const { createApp, ref, computed, onMounted } = Vue;
+      const { ElMessage } = ElementPlus;
+      
+      // API服务
+      const api = axios.create({
+        baseURL: 'http://localhost:6519/api',
+        timeout: 10000,
+      });
+      
+      const getStatus = () => api.get('/status');
+      const getOrders = () => api.get('/orders');
+      const getTargets = () => api.get('/targets');
+      const deleteTarget = (index) => api.delete(`/targets/${index}`);
+      const getMarketContext = () => api.get('/market-context');
+      
+      // 组件
+      const StatusCard = {
+        template: `
+          <el-card class="w-full mb-4">
+            <template #header>
+              <div class="flex justify-between items-center">
+                <span class="text-xl font-bold">策略状态</span>
+                <el-button type="primary" size="small" @click="fetchStatus">刷新</el-button>
+              </div>
+            </template>
+            <div v-if="loading" class="flex justify-center py-8">
+              <el-icon class="is-loading"><svg-icon name="Loading" /></el-icon>
+            </div>
+            <div v-else class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <el-card shadow="hover" class="bg-blue-50 dark:bg-blue-900">
+                <div class="text-center">
+                  <div class="text-2xl font-bold">{{ status.running ? '运行中' : '已停止' }}</div>
+                  <div class="text-gray-600 dark:text-gray-300">运行状态</div>
+                </div>
+              </el-card>
+              <el-card shadow="hover" class="bg-green-50 dark:bg-green-900">
+                <div class="text-center">
+                  <div class="text-2xl font-bold">{{ status.thread_alive ? '活跃' : '非活跃' }}</div>
+                  <div class="text-gray-600 dark:text-gray-300">线程状态</div>
+                </div>
+              </el-card>
+              <el-card shadow="hover" class="bg-purple-50 dark:bg-purple-900">
+                <div class="text-center">
+                  <div class="text-2xl font-bold">{{ status.rest_service_running ? '运行中' : '已停止' }}</div>
+                  <div class="text-gray-600 dark:text-gray-300">REST服务</div>
+                </div>
+              </el-card>
+            </div>
+          </el-card>
+        `,
+        setup() {
+          const status = ref({
+            running: false,
+            thread_alive: false,
+            rest_service_running: false,
+          });
+          const loading = ref(true);
+          
+          const fetchStatus = async () => {
+            loading.value = true;
+            try {
+              console.log('开始获取策略状态...');
+              const response = await getStatus();
+              console.log('获取策略状态成功:', response.data);
+              status.value = response.data;
+            } catch (error) {
+              console.error('获取状态失败:', error);
+              if (error.response) {
+                console.error('响应数据:', error.response.data);
+                console.error('响应状态:', error.response.status);
+              } else if (error.request) {
+                console.error('请求未收到响应:', error.request);
+              } else {
+                console.error('请求配置错误:', error.message);
+              }
+            } finally {
+              loading.value = false;
+            }
+          };
+          
+          onMounted(fetchStatus);
+          
+          return {
+            status,
+            loading,
+            fetchStatus
+          };
+        }
+      };
+      
+      const OrdersTable = {
+        template: `
+          <el-card class="w-full mb-4">
+            <template #header>
+              <div class="flex justify-between items-center">
+                <span class="text-xl font-bold">订单信息</span>
+                <el-button type="primary" size="small" @click="fetchOrders">刷新</el-button>
+              </div>
+            </template>
+            <div v-if="loading" class="flex justify-center py-8">
+              <el-icon class="is-loading"><svg-icon name="Loading" /></el-icon>
+            </div>
+            <div v-else-if="error" class="text-center text-red-500 py-8">
+              {{ error }}
+            </div>
+            <el-table v-else :data="orderList" style="width: 100%" stripe>
+              <el-table-column prop="stock_code" label="股票代码" width="120" />
+              <el-table-column prop="order_id" label="订单ID" width="200" />
+              <el-table-column prop="order_type" label="订单类型" width="100" />
+              <el-table-column prop="price" label="价格" width="100" />
+              <el-table-column prop="volume" label="数量" width="100" />
+              <el-table-column prop="status" label="状态" width="100" />
+              <el-table-column prop="ref" label="备注" />
+            </el-table>
+          </el-card>
+        `,
+        setup() {
+          const orders = ref({});
+          const loading = ref(true);
+          const error = ref('');
+          
+          const orderList = computed(() => {
+            const list = [];
+            for (const stockCode in orders.value) {
+              orders.value[stockCode].forEach(order => {
+                list.push({ ...order, stock_code: stockCode });
+              });
+            }
+            return list;
+          });
+          
+          const fetchOrders = async () => {
+            loading.value = true;
+            error.value = '';
+            try {
+              console.log('开始获取订单信息...');
+              const response = await getOrders();
+              console.log('获取订单信息成功:', response.data);
+              orders.value = response.data;
+            } catch (err) {
+              error.value = '获取订单失败';
+              console.error('获取订单失败:', err);
+              if (err.response) {
+                console.error('响应数据:', err.response.data);
+                console.error('响应状态:', err.response.status);
+              } else if (err.request) {
+                console.error('请求未收到响应:', err.request);
+              } else {
+                console.error('请求配置错误:', err.message);
+              }
+            } finally {
+              loading.value = false;
+            }
+          };
+          
+          onMounted(fetchOrders);
+          
+          return {
+            orders,
+            loading,
+            error,
+            orderList,
+            fetchOrders
+          };
+        }
+      };
+      
+      const TargetsTable = {
+        template: `
+          <el-card class="w-full mb-4">
+            <template #header>
+              <div class="flex justify-between items-center">
+                <span class="text-xl font-bold">目标股票列表</span>
+                <el-button type="primary" size="small" @click="fetchTargets">刷新</el-button>
+              </div>
+            </template>
+            <div v-if="loading" class="flex justify-center py-8">
+              <el-icon class="is-loading"><svg-icon name="Loading" /></el-icon>
+            </div>
+            <el-table v-else :data="targets" style="width: 100%" stripe>
+              <el-table-column type="index" label="行号" width="80" />
+              <el-table-column prop="stock_code" label="股票代码" width="120" />
+              <el-table-column prop="buy_step" label="买入阶梯" width="100" />
+              <el-table-column prop="sell_step" label="卖出阶梯" width="100" />
+              <el-table-column prop="vol" label="数量" width="80" />
+              <el-table-column prop="policy" label="策略ID" width="80" />
+              <el-table-column prop="down_price" label="地板价" width="100" />
+              <el-table-column prop="up_price" label="天花板价" width="100" />
+              <el-table-column prop="ma30" label="MA30" width="100" />
+              <el-table-column prop="buy_coef" label="买入系数" width="100" />
+              <el-table-column label="操作" width="120">
+                <template #default="{ row, $index }">
+                  <el-button 
+                    type="danger" 
+                    size="small" 
+                    @click="handleDelete($index)"
+                    :loading="deletingIndex === $index"
+                  >
+                    删除
+                  </el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </el-card>
+        `,
+        setup() {
+          const targets = ref([]);
+          const loading = ref(true);
+          const deletingIndex = ref(-1);
+          
+          const fetchTargets = async () => {
+            loading.value = true;
+            try {
+              console.log('开始获取目标股票列表...');
+              const response = await getTargets();
+              console.log('获取目标股票列表成功:', response.data);
+              targets.value = response.data;
+            } catch (error) {
+              console.error('获取目标股票失败:', error);
+              if (error.response) {
+                console.error('响应数据:', error.response.data);
+                console.error('响应状态:', error.response.status);
+              } else if (error.request) {
+                console.error('请求未收到响应:', error.request);
+              } else {
+                console.error('请求配置错误:', error.message);
+              }
+              ElMessage.error('获取目标股票失败');
+            } finally {
+              loading.value = false;
+            }
+          };
+          
+          const handleDelete = async (index) => {
+            deletingIndex.value = index;
+            try {
+              const response = await deleteTarget(index);
+              if (response.data.success) {
+                ElMessage.success(response.data.message);
+                await fetchTargets();
+              } else {
+                ElMessage.error(response.data.message);
+              }
+            } catch (error) {
+              console.error('删除目标股票失败:', error);
+              ElMessage.error('删除目标股票失败');
+            } finally {
+              deletingIndex.value = -1;
+            }
+          };
+          
+          onMounted(fetchTargets);
+          
+          return {
+            targets,
+            loading,
+            deletingIndex,
+            fetchTargets,
+            handleDelete
+          };
+        }
+      };
+      
+      const MarketContext = {
+        template: `
+          <el-card class="w-full mb-4">
+            <template #header>
+              <div class="flex justify-between items-center">
+                <span class="text-xl font-bold">市场数据</span>
+                <el-button type="primary" size="small" @click="fetchMarketContext">刷新</el-button>
+              </div>
+            </template>
+            <div v-if="loading" class="flex justify-center py-8">
+              <el-icon class="is-loading"><svg-icon name="Loading" /></el-icon>
+            </div>
+            <div v-else-if="error" class="text-center text-red-500 py-8">
+              {{ error }}
+            </div>
+            <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <el-card shadow="hover" class="bg-blue-50 dark:bg-blue-900">
+                <div class="text-center">
+                  <div class="text-2xl font-bold">{{ marketContext.sh_index }}</div>
+                  <div class="text-gray-600 dark:text-gray-300">上证指数</div>
+                </div>
+              </el-card>
+              <el-card shadow="hover" class="bg-green-50 dark:bg-green-900">
+                <div class="text-center">
+                  <div class="text-2xl font-bold">{{ marketContext.sh_ratio }}</div>
+                  <div class="text-gray-600 dark:text-gray-300">上证指数涨跌幅</div>
+                </div>
+              </el-card>
+              <el-card shadow="hover" class="bg-purple-50 dark:bg-purple-900">
+                <div class="text-center">
+                  <div class="text-2xl font-bold">{{ marketContext.sh_open_ratio }}</div>
+                  <div class="text-gray-600 dark:text-gray-300">上证指数开盘涨跌幅</div>
+                </div>
+              </el-card>
+              <el-card shadow="hover" class="bg-yellow-50 dark:bg-yellow-900">
+                <div class="text-center">
+                  <div class="text-2xl font-bold">{{ marketContext.sh_k_ratio }}</div>
+                  <div class="text-gray-600 dark:text-gray-300">上证指数K线涨跌幅</div>
+                </div>
+              </el-card>
+              <el-card shadow="hover" class="bg-red-50 dark:bg-red-900">
+                <div class="text-center">
+                  <div class="text-2xl font-bold">{{ marketContext.vol }}</div>
+                  <div class="text-gray-600 dark:text-gray-300">市场成交量</div>
+                </div>
+              </el-card>
+              <el-card shadow="hover" class="bg-indigo-50 dark:bg-indigo-900">
+                <div class="text-center">
+                  <div class="text-2xl font-bold">{{ marketContext.amount }}</div>
+                  <div class="text-gray-600 dark:text-gray-300">市场成交金额</div>
+                </div>
+              </el-card>
+            </div>
+          </el-card>
+        `,
+        setup() {
+          const marketContext = ref({
+            sh_index: '-',
+            sh_ratio: '-',
+            sh_open_ratio: '-',
+            sh_k_ratio: '-',
+            vol: '-',
+            amount: '-',
+          });
+          const loading = ref(true);
+          const error = ref('');
+          
+          const fetchMarketContext = async () => {
+            loading.value = true;
+            error.value = '';
+            try {
+              console.log('开始获取市场数据...');
+              const response = await getMarketContext();
+              console.log('获取市场数据成功:', response.data);
+              marketContext.value = response.data;
+            } catch (err) {
+              error.value = '获取市场数据失败';
+              console.error('获取市场数据失败:', err);
+              if (err.response) {
+                console.error('响应数据:', err.response.data);
+                console.error('响应状态:', err.response.status);
+              } else if (err.request) {
+                console.error('请求未收到响应:', err.request);
+              } else {
+                console.error('请求配置错误:', err.message);
+              }
+            } finally {
+              loading.value = false;
+            }
+          };
+          
+          onMounted(fetchMarketContext);
+          
+          return {
+            marketContext,
+            loading,
+            error,
+            fetchMarketContext
+          };
+        }
+      };
+      
+      // 根组件
+      const App = {
+        template: `
+          <div class="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+            <header class="bg-white dark:bg-gray-800 shadow-md">
+              <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+                <h1 class="text-2xl font-bold text-blue-600 dark:text-blue-400">Shock Strategy Dashboard</h1>
+                <el-button type="primary" @click="refreshAll">全部刷新</el-button>
+              </div>
+            </header>
+            <main class="container mx-auto px-4 py-6">
+              <StatusCard ref="statusCard" />
+              <MarketContext ref="marketContext" />
+              <OrdersTable ref="ordersTable" />
+              <TargetsTable ref="targetsTable" />
+            </main>
+            <footer class="bg-white dark:bg-gray-800 shadow-md mt-8">
+              <div class="container mx-auto px-4 py-4 text-center">
+                <p>© {{ new Date().getFullYear() }} Shock Strategy Dashboard</p>
+              </div>
+            </footer>
+          </div>
+        `,
+        components: {
+          StatusCard,
+          OrdersTable,
+          TargetsTable,
+          MarketContext
+        },
+        setup() {
+          const statusCard = ref(null);
+          const ordersTable = ref(null);
+          const targetsTable = ref(null);
+          const marketContext = ref(null);
+          
+          const refreshAll = () => {
+            statusCard.value?.fetchStatus();
+            ordersTable.value?.fetchOrders();
+            targetsTable.value?.fetchTargets();
+            marketContext.value?.fetchMarketContext();
+          };
+          
+          return {
+            statusCard,
+            ordersTable,
+            targetsTable,
+            marketContext,
+            refreshAll
+          };
+        }
+      };
+      
+      // 创建应用
+      const app = createApp(App);
+      app.use(ElementPlus);
+      app.mount('#app');
+    </script>
+  </body>
+</html>

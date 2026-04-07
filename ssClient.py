@@ -48,6 +48,16 @@ class SSClient:
             print(f"删除目标股票失败: {str(e)}")
             return None
     
+    def get_market_context(self):
+        """获取市场数据"""
+        try:
+            response = requests.get(f'{self.base_url}/market-context')
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            print(f"获取市场数据失败: {str(e)}")
+            return None
+    
     def print_status(self):
         """以列表形式打印状态信息"""
         status = self.get_status()
@@ -92,6 +102,21 @@ class SSClient:
         self.print_status()
         self.print_orders()
         self.print_targets()
+    
+    def print_market_context(self):
+        """以列表形式打印市场数据"""
+        market_context = self.get_market_context()
+        if market_context:
+            print("\n=== 市场数据 ===")
+            if 'error' in market_context:
+                print(f"错误: {market_context['error']}")
+            else:
+                print(f"上证指数: {market_context.get('sh_index')}")
+                print(f"上证指数涨跌幅: {market_context.get('sh_ratio')}")
+                print(f"上证指数开盘涨跌幅: {market_context.get('sh_open_ratio')}")
+                print(f"上证指数当前价与开盘价的涨跌幅: {market_context.get('sh_k_ratio')}")
+                print(f"市场成交量: {market_context.get('vol')}")
+                print(f"市场成交金额: {market_context.get('amount')}")
 
 def main():
     """主函数，处理命令行参数"""
@@ -104,6 +129,7 @@ def main():
         print("  python ssClient.py show orders     - 显示订单信息")
         print("  python ssClient.py show targets    - 显示目标股票信息")
         print("  python ssClient.py del target <索引> - 删除指定索引的目标股票")
+        print("  python ssClient.py market-context   - 显示市场数据")
         return
     
     # 处理命令
@@ -141,9 +167,11 @@ def main():
         else:
             print(f"错误: 未知的del子命令: {sub_command}")
             print("可用的子命令: target")
+    elif command == 'market-context':
+        client.print_market_context()
     else:
         print(f"错误: 未知命令: {command}")
-        print("可用的命令: status, show, del")
+        print("可用的命令: status, show, del, market-context")
 
 if __name__ == "__main__":
     main()

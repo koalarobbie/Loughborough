@@ -1,22 +1,26 @@
  # -*- coding: utf-8 -*-
 # 震荡策略，该策略针对单支股票在一定价格位置进行买入卖出，即当股票低于一定价格位置即买入、买入股票高于一定价格位置即卖出，通过股票的价格波动获利
-from xtquant import xtconstant
+from xtquant import xtconstant,xtdata
 import time
 from datetime import datetime
-from xtquant import xtdata
 import pandas as pd
 import sqlite3
 import configparser
 from sqlalchemy import create_engine
 from DPTrader import *
 from DPData import *
-from ssOrders import *
 from loguru import logger
 from log_config import *
 from misc import *
 import threading
 import json
 from flask import Flask, jsonify, Response
+from target import Target
+from flask_cors import CORS
+# 延迟导入ssOrders和ssOrder，避免循环导入
+#ssOrders = None
+#ssOrder = None
+from ssOrders import ssOrders, ssOrder
 
 MODE_NORMAL = 0
 MODE_MONITOR= 1
@@ -35,26 +39,15 @@ STATE_CLOSING_DONE = 895
 STATE_CLOSED = 900
 
  
-class Target: 
-    def __init__(self):
-        self.stock_code = ""
-        self.buy_step = 0.0         #买入价格阶梯，即当股票价格比上次买入价格低buy_step时，触发买入
-        self.sell_step = 0.0        #卖出价格阶梯，即当股票价格比上次卖入价格高sell_step时，触发卖出
-        self.vol = 0                #每次买入卖出的数量
-        self.buy_times = 0  
-        self.policy = 0             #标的遵循的策略ID
-        self.down_price = 0.0       #买入的地板价，即当股票价格比地板价低时，不再买入
-        self.up_price = 0.0         #买入的天花板价，即当股票价格比天花板价高时，不再买入
-        self.ma30 = -1              #30日均线价格
-        self.buy_coef = 1.0         #买入系数,买入阶梯价*买入系数为实际买入阶梯价
-
-
 QUERY_TRANSACTION = 'SELECT * FROM tansactions'
 CONFIG_FILE = 'shock.ini'
 
 class ShockStrategy:
     transaction_db = 'sqlite:///transactions.db'
     def __init__(self,mode = 0,max_order = 5):
+        global ssOrders, ssOrder
+        if ssOrders is None:
+            from ssOrders import ssOrders, ssOrder
         self.trader = None
         self.conn = None
         self.transactions = None
@@ -62,6 +55,8 @@ class ShockStrategy:
         self.max_order = max_order
         self.targets = []
         self.orders = ssOrders()
+        self.data_source = QuantData()
+        self.market_context = Context(self.data_source)
         self._thread = None
         self._running = False
         # RESTful服务相关
@@ -179,57 +174,71 @@ class ShockStrategy:
     def _init_rest_app(self):
         """初始化RESTful应用"""
         self._rest_app = Flask(__name__)
+        # 初始化CORS，允许所有跨域请求
+        CORS(self._rest_app)
         
         @self._rest_app.route('/api/status', methods=['GET'])
         def get_status():
             """获取策略运行状态"""
             status = {
                 'running': self._running,
-                'thread_alive': self._thread.is_alive() if self._thread else False,
+                'thread_alive': self._thread is not None and self._thread.is_alive(),
                 'rest_service_running': self._rest_running
             }
-            return jsonify(status)
+            response = jsonify(status)
+            
+            # 添加CORS头
+            response.headers['Access-Control-Allow-Origin'] = '*'
+            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+            return response
         
         @self._rest_app.route('/api/orders', methods=['GET'])
         def get_orders():
             """获取orders对象信息"""
             if not hasattr(self, 'orders') or not self.orders:
-                return jsonify({'error': 'Orders not initialized'})
+                response = jsonify({'error': 'Orders not initialized'})
+            else:
+                orders_data = {}
+                for key in self.orders.data:
+                    orders_data[key] = []
+                    orders = self.orders.data[key]
+                    for order in orders:
+                        # 映射订单状态到中文含义
+                        status_map = {
+                            50: '已报',
+                            54: '已撤',
+                            56: '已成',
+                            57: '废单',
+                            101: '已买已卖',
+                            102: '已买在卖'
+                        }
+                        status_text = status_map.get(order.status, str(order.status))
+                        
+                        order_info = {
+                            'stock_code': str(key),
+                            'order_id': str(order.order_id),
+                            'order_type': str(order.order_type),
+                            'price': '{:.2f}'.format(order.price) if isinstance(order.price, (int, float)) else str(order.price),
+                            'volume': str(order.volume),
+                            'status': status_text,
+                            'ref': str(order.ref)
+                        }
+                        orders_data[key].append(order_info)
+                #print(f"当前订单数据: {orders_data}")  # 打印订单数据到控制台
+                # 使用json.dumps序列化数据，然后返回Response对象
+                try:
+                    json_data = json.dumps(orders_data, ensure_ascii=False)
+                    response = Response(json_data, mimetype='application/json')
+                except Exception as e:
+                    logger.error(f"JSON序列化失败: {str(e)}")
+                    response = jsonify({'error': f'JSON序列化失败: {str(e)}'})
             
-            orders_data = {}
-            for key in self.orders.data:
-                orders_data[key] = []
-                orders = self.orders.data[key]
-                for order in orders:
-                    # 映射订单状态到中文含义
-                    status_map = {
-                        50: '已报',
-                        54: '已撤',
-                        56: '已成',
-                        57: '废单',
-                        101: '已买已卖',
-                        102: '已买在卖'
-                    }
-                    status_text = status_map.get(order.status, str(order.status))
-                    
-                    order_info = {
-                        'stock_code': str(key),
-                        'order_id': str(order.order_id),
-                        'order_type': str(order.order_type),
-                        'price': '{:.2f}'.format(order.price) if isinstance(order.price, (int, float)) else str(order.price),
-                        'volume': str(order.volume),
-                        'status': status_text,
-                        'ref': str(order.ref)
-                    }
-                    orders_data[key].append(order_info)
-            #print(f"当前订单数据: {orders_data}")  # 打印订单数据到控制台
-            # 使用json.dumps序列化数据，然后返回Response对象
-            try:
-                json_data = json.dumps(orders_data, ensure_ascii=False)
-                return Response(json_data, mimetype='application/json')
-            except Exception as e:
-                logger.error(f"JSON序列化失败: {str(e)}")
-                return jsonify({'error': f'JSON序列化失败: {str(e)}'})
+            # 添加CORS头
+            response.headers['Access-Control-Allow-Origin'] = '*'
+            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+            return response
         
         @self._rest_app.route('/api/targets', methods=['GET'])
         def get_targets():
@@ -251,19 +260,62 @@ class ShockStrategy:
             # 使用json.dumps序列化数据，然后返回Response对象
             try:
                 json_data = json.dumps(targets_data, ensure_ascii=False)
-                return Response(json_data, mimetype='application/json')
+                response = Response(json_data, mimetype='application/json')
             except Exception as e:
                 logger.error(f"JSON序列化失败: {str(e)}")
-                return jsonify({'error': f'JSON序列化失败: {str(e)}'})
+                response = jsonify({'error': f'JSON序列化失败: {str(e)}'})
+            
+            # 添加CORS头
+            response.headers['Access-Control-Allow-Origin'] = '*'
+            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+            return response
         
         @self._rest_app.route('/api/targets/<int:index>', methods=['DELETE'])
         def delete_target(index):
             """删除指定索引的target"""
             success, deleted_target = self.DeleteTarget(index)
             if success:
-                return jsonify({'success': True, 'message': f'已删除目标股票: {deleted_target.stock_code}'})
+                response = jsonify({'success': True, 'message': f'已删除目标股票: {deleted_target.stock_code}'})
             else:
-                return jsonify({'success': False, 'message': '无效的目标股票索引'}), 404
+                response = jsonify({'success': False, 'message': '无效的目标股票索引'})
+                response.status_code = 404
+            
+            # 添加CORS头
+            response.headers['Access-Control-Allow-Origin'] = '*'
+            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+            return response
+        
+        @self._rest_app.route('/api/market-context', methods=['GET'])
+        def get_market_context():
+            """获取当前市场数据"""
+            try:
+                # 更新市场上下文数据
+                self.market_context.Update_Context()
+                
+                # 构建市场数据字典
+                market_data = {
+                    'sh_index': str(self.market_context.sh_index),
+                    'sh_ratio': '{:.4f}'.format(self.market_context.sh_ratio) if isinstance(self.market_context.sh_ratio, (int, float)) else str(self.market_context.sh_ratio),
+                    'sh_open_ratio': '{:.4f}'.format(self.market_context.sh_open_ratio) if isinstance(self.market_context.sh_open_ratio, (int, float)) else str(self.market_context.sh_open_ratio),
+                    'sh_k_ratio': '{:.4f}'.format(self.market_context.sh_k_ratio) if isinstance(self.market_context.sh_k_ratio, (int, float)) else str(self.market_context.sh_k_ratio),
+                    'vol': str(self.market_context.vol),
+                    'amount': '{:.2f}'.format(self.market_context.amount) if isinstance(self.market_context.amount, (int, float)) else str(self.market_context.amount)
+                }
+                
+                # 使用json.dumps序列化数据，然后返回Response对象
+                json_data = json.dumps(market_data, ensure_ascii=False)
+                response = Response(json_data, mimetype='application/json')
+            except Exception as e:
+                logger.error(f"获取市场数据失败: {str(e)}")
+                response = jsonify({'error': f'获取市场数据失败: {str(e)}'})
+            
+            # 添加CORS头
+            response.headers['Access-Control-Allow-Origin'] = '*'
+            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+            return response
     
     def StartRestService(self):
         """启动RESTful服务"""
@@ -362,8 +414,8 @@ class ShockStrategy:
                     print("当前存在的已买入未卖出交易")
                     print(self.transactions)
                 
-                market_context.Update_Context()
-                market_context.Dump_Context()
+                self.market_context.Update_Context()
+                self.market_context.Dump_Context()
 
                 #获取消息推送，更新交易状态
                 message_flag = 0
@@ -485,8 +537,6 @@ if __name__ == "__main__":
     ACCOUNT_ID = account_id#
     print(f"[{datetime.now()}] 启动量化交易程序")
     trader = QuantTrader(QMT_PATH, SESSION_ID, ACCOUNT_ID)
-    data_source = QuantData()
-    market_context = Context(data_source)
 
     now = datetime.now()
     print(f"datetime方法 - 当前时间: {now.hour:02d}:{now.minute:02d}")

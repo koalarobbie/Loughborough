@@ -39,6 +39,7 @@ class QuantData:
             quote = xtdata.get_full_tick([stock_code])
             if quote and stock_code in quote:
                 ratio  = round((quote[stock_code]['lastPrice'] - quote[stock_code]['lastClose']) / quote[stock_code]['lastClose'] , 4)
+                return ratio
         except Exception as e:
             print(f"[{datetime.now()}] 获取涨幅失败: {e}")
         return None
@@ -127,7 +128,7 @@ class Context:
         self.sh_index = self.ds.get_realtime_price('000001.SH')
         self.sh_ratio = self.ds.get_current_ratio('000001.SH')
         self.sh_open_ratio = self.ds.get_open_ratio('000001.SH')
-        self.sh_k_ratio = self.ds.get_current_ratio('000001.SH')
+        self.sh_k_ratio = self.ds.get_k_ratio('000001.SH')
         self.vol = self.ds.get_current_volume('000001.SH')
         self.amount = self.ds.get_current_amount()
 

@@ -7,6 +7,7 @@ import pandas as pd
 from loguru import logger
 from DPData import *
 from misc import *
+from target import Target
 
 PRICE_PRECISION = 3
 
@@ -124,6 +125,7 @@ class ssOderDecision:
 
     def GetMaxSellId(self):
         return self.max_sell_id
+        return self.max_sell_id
 
     def GetBuyCancelId(self):
         return self.buy_cancel_id
@@ -166,30 +168,6 @@ class ssOderDecision:
     
 
 
-#策略上下文，提供进行策略决策的上下文信息
-class Context:
-    def __init__(self,datasource:QuantData = None):
-        self.sh_index = 0           #上证指数
-        self.sh_ratio = 0           #上证指数涨跌幅
-        self.sh_open_ratio = 0      #上证指数开盘涨跌幅
-        self.sh_k_ratio = 0         #上证指数当前价与开盘价的涨跌幅
-        self.vol = 0                #市场成交量
-        self.amount = 0             #市场成交金额 
-        self.ds = datasource if datasource is not None else QuantData() #数据接口
-
-
-    def Update_Context(self):
-        self.sh_index = self.ds.get_realtime_price('000001.SH')
-        self.sh_ratio = self.ds.get_current_ratio('000001.SH')
-        self.sh_open_ratio = self.ds.get_open_ratio('000001.SH')
-        self.sh_k_ratio = self.ds.get_current_ratio('000001.SH')
-        self.vol = self.ds.get_current_volume('000001.SH')
-        self.amount = self.ds.get_current_amount()
-
-    
-    def Dump_Context(self):
-        logger.info(f"上证指数：{self.sh_index}, 上证指数涨跌幅：{self.sh_ratio}, 上证指数开盘涨跌幅：{self.sh_open_ratio}, 上证指数当前价与开盘价的涨跌幅：{self.sh_k_ratio}, 市场成交量：{self.vol}, 市场成交金额：{self.amount}")
-
 
 class ssOrder:
     def __init__(self,id:str, type:int, code:str, price:float, volume:int, status:int,ref:str=""):
@@ -229,7 +207,7 @@ class ssOrders:
     
     def Remove(self,code:str, id:str):
         orders = self.data[code]
-        if orders is not None:
+        if order is not None:
             for order in orders:
                 if order.order_id == id:
                     orders.remove(order)
@@ -383,7 +361,7 @@ class ssOrders:
         return od
 
 
-    def OrderDecision(self, target,mode:int, real_price:float,buy_step:float,sell_step:float): #判断是否需要执行新的买入卖出交易，以及交易价格是多少
+    def OrderDecision(self, target:Target,mode:int, real_price:float,buy_step:float,sell_step:float): #判断是否需要执行新的买入卖出交易，以及交易价格是多少
         if target.policy == 0:
             #print(f"执行T_OrderDecision策略，股票代码：{target.stock_code},当前价格:{real_price}")
             return self.T_OrderDecision(target.stock_code,mode, real_price,buy_step,sell_step,target.ma30)
