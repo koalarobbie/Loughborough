@@ -1,0 +1,4 @@
+# 忽略__pycache__文件夹及其内容
+__pycache__/
+running_log.log
+transactions.db

@@ -1,4 +1,4 @@
- # -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 # 震荡策略，该策略针对单支股票在一定价格位置进行买入卖出，即当股票低于一定价格位置即买入、买入股票高于一定价格位置即卖出，通过股票的价格波动获利
 from xtquant import xtconstant,xtdata
 import time
@@ -125,6 +125,8 @@ class ShockStrategy:
             target.up_price = config.getfloat(sec, 'up_price') if config.has_option(sec, 'up_price') else 999
             # 计算并设置当前 MA30 指标值
             target.ma30 = get_current_ma30(sec)
+            # 读取是否启用（如果配置中存在），默认为 1
+            target.enabled = config.getint(sec, 'enabled') if config.has_option(sec, 'enabled') else 1
             # 打印配置信息（已注释）
             #print(f"读取配置 - 股票代码:{target.stock_code}, 买入阶梯:{target.buy_step}, 卖出阶梯:{target.sell_step}, 交易数量:{target.vol}, 策略ID:{target.policy}, 买入地板价:{target.down_price}, 买入天花板价:{target.up_price}, 当前MA30价:{target.ma30}")
             #print(f"读取配置 - 股票代码:{target.stock_code}, 买入阶梯:{target.buy_step}, 卖出阶梯:{target.sell_step}, 交易数量:{target.vol}, 策略ID:{target.policy}, 买入地板价:{target.down_price}, 买入天花板价:{target.up_price}")
@@ -134,6 +136,15 @@ class ShockStrategy:
         # 返回目标股票列表
         return targets
 
+    def UpdateTargetsbyMarketContext(self):
+        for target in self.targets:
+            # 根据市场上下文信息调整目标股票的交易参数
+            # 根据昨收价设置买入天花板价
+            last_close = self.data_source.get_last_close(target.stock_code)
+            #print(f"更新目标股票参数 - 股票代码:{target.stock_code}, 昨收价:{last_close}, 原买入天花板价:{target.up_price}, 原买入地板价:{target.down_price}")
+            if last_close is not None:
+                if target.up_price > last_close * 1.02: target.up_price = round(last_close * 1.02, 2)
+                if target.down_price < last_close * 0.98: target.down_price = round(last_close * 0.98, 2)
 
     def ReverseResponse(self): 
         real_price = self.trader.get_realtime_price('131810.SZ')
@@ -169,7 +180,7 @@ class ShockStrategy:
             logger.info("策略守护进程已停止")
         else:
             logger.info("策略未在运行")
-
+    
     
     def _init_rest_app(self):
         """初始化RESTful应用"""
@@ -254,7 +265,8 @@ class ShockStrategy:
                     'down_price': '{:.2f}'.format(target.down_price) if isinstance(target.down_price, (int, float)) else str(target.down_price),
                     'up_price': '{:.2f}'.format(target.up_price) if isinstance(target.up_price, (int, float)) else str(target.up_price),
                     'ma30': '{:.2f}'.format(target.ma30) if isinstance(target.ma30, (int, float)) else str(target.ma30),
-                    'buy_coef': '{:.2f}'.format(target.buy_coef) if isinstance(target.buy_coef, (int, float)) else str(target.buy_coef)
+                    'buy_coef': '{:.2f}'.format(target.buy_coef) if isinstance(target.buy_coef, (int, float)) else str(target.buy_coef),
+                    'enabled': str(target.enabled)
                 }
                 targets_data.append(target_info)
             # 使用json.dumps序列化数据，然后返回Response对象
@@ -277,6 +289,38 @@ class ShockStrategy:
             success, deleted_target = self.DeleteTarget(index)
             if success:
                 response = jsonify({'success': True, 'message': f'已删除目标股票: {deleted_target.stock_code}'})
+            else:
+                response = jsonify({'success': False, 'message': '无效的目标股票索引'})
+                response.status_code = 404
+            
+            # 添加CORS头
+            response.headers['Access-Control-Allow-Origin'] = '*'
+            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+            return response
+        
+        @self._rest_app.route('/api/targets/<int:index>/enable', methods=['POST'])
+        def enable_target(index):
+            """启用指定索引的target"""
+            if 0 <= index < len(self.targets):
+                self.targets[index].enabled = 1
+                response = jsonify({'success': True, 'message': f'已启用目标股票: {self.targets[index].stock_code}'})
+            else:
+                response = jsonify({'success': False, 'message': '无效的目标股票索引'})
+                response.status_code = 404
+            
+            # 添加CORS头
+            response.headers['Access-Control-Allow-Origin'] = '*'
+            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+            return response
+        
+        @self._rest_app.route('/api/targets/<int:index>/disable', methods=['POST'])
+        def disable_target(index):
+            """禁用指定索引的target"""
+            if 0 <= index < len(self.targets):
+                self.targets[index].enabled = 0
+                response = jsonify({'success': True, 'message': f'已禁用目标股票: {self.targets[index].stock_code}'})
             else:
                 response = jsonify({'success': False, 'message': '无效的目标股票索引'})
                 response.status_code = 404
@@ -369,8 +413,9 @@ class ShockStrategy:
         #读取交易配置
         print("读取配置信息!")
         self.targets = self.ReadConfig()
+        self.UpdateTargetsbyMarketContext()
         #for target in self.targets:
-        #    print(target.stock_code,target.buy_step,target.sell_step,target.vol)
+        #    print(target.stock_code,target.buy_step,target.sell_step,target.vol,target.policy,target.down_price,target.up_price,target.ma30,target.enabled)
         self.orders.Init(self.targets)
         
 
@@ -454,6 +499,9 @@ class ShockStrategy:
                 #交易委托
                 if state < STATE_CLOSING:
                     for target in self.targets:
+                        # 跳过禁用的target
+                        if target.enabled != 1:
+                            continue
                         real_price = self.trader.get_realtime_price(target.stock_code)
                         if real_price != None:
                             od = self.orders.OrderDecision(target,self.mode,real_price,target.buy_step,target.sell_step)

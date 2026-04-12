@@ -99,6 +99,15 @@ class QuantData:
             print(f"[{datetime.now()}] 获取成交量失败: {e}")
         return None
     
+    def get_last_close(self, stock_code:str)->float:
+        try:
+            quote = xtdata.get_full_tick([stock_code])
+            if quote and stock_code in quote:
+                last_close  = quote[stock_code]['lastClose']
+                return last_close
+        except Exception as e:
+            print(f"[{datetime.now()}] 获取昨收价格失败: {e}")
+        return None
     """
     def get_current_amount(self, stock_code:str)->float:
         try:

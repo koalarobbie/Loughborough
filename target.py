@@ -13,3 +13,4 @@ class Target:
         self.up_price = 0.0   # 买入的天花板价，即当股票价格比天花板价高时，不再买入
         self.ma30 = -1        # 30日均线价格
         self.buy_coef = 1.0   # 买入系数,买入阶梯价*买入系数为实际买入阶梯价
+        self.enabled = 1      # 是否启用，1为启用，0为禁用

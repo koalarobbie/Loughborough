@@ -3,7 +3,7 @@
 import requests
 import json
 import sys
-
+#47.94.165.39
 class SSClient:
     def __init__(self, host='localhost', port=6519):
         self.base_url = f'http://{host}:{port}/api'
@@ -44,8 +44,28 @@ class SSClient:
             response = requests.delete(f'{self.base_url}/targets/{index}')
             response.raise_for_status()
             return response.json()
-        except Exception as e:
+        except requests.exceptions.RequestException as e:
             print(f"删除目标股票失败: {str(e)}")
+            return None
+
+    def enable_target(self, index):
+        """启用指定索引的target"""
+        try:
+            response = requests.post(f'{self.base_url}/targets/{index}/enable')
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            print(f"启用目标股票失败: {str(e)}")
+            return None
+
+    def disable_target(self, index):
+        """禁用指定索引的target"""
+        try:
+            response = requests.post(f'{self.base_url}/targets/{index}/disable')
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            print(f"禁用目标股票失败: {str(e)}")
             return None
     
     def get_market_context(self):
@@ -91,11 +111,12 @@ class SSClient:
         targets = self.get_targets()
         if targets:
             print("\n=== 目标股票列表 ===")
-            print(f"{'行号':<6} {'股票代码':<12} {'买入阶梯':<10} {'卖出阶梯':<10} {'数量':<8} {'策略ID':<8} {'地板价':<10} {'天花板价':<10} {'MA30':<10} {'买入系数':<10}")
-            print("-" * 110)
+            print(f"{'行号':<6} {'股票代码':<12} {'买入阶梯':<10} {'卖出阶梯':<10} {'数量':<8} {'策略ID':<8} {'地板价':<10} {'天花板价':<10} {'MA30':<10} {'买入系数':<10} {'启用':<6}")
+            print("-" * 120)
             for i, target in enumerate(targets):
-                print(f"{i:<6} {target['stock_code']:<12} {target['buy_step']:<10} {target['sell_step']:<10} {target['vol']:<8} {target['policy']:<8} {target['down_price']:<10} {target['up_price']:<10} {target['ma30']:<10} {target['buy_coef']:<10}")
-            print("-" * 110)
+                enabled_str = '是' if target.get('enabled', '1') == '1' else '否'
+                print(f"{i:<6} {target['stock_code']:<12} {target['buy_step']:<10} {target['sell_step']:<10} {target['vol']:<8} {target['policy']:<8} {target['down_price']:<10} {target['up_price']:<10} {target['ma30']:<10} {target['buy_coef']:<10} {enabled_str:<6}")
+            print("-" * 120)
     
     def print_all(self):
         """打印所有信息"""
@@ -129,6 +150,8 @@ def main():
         print("  python ssClient.py show orders     - 显示订单信息")
         print("  python ssClient.py show targets    - 显示目标股票信息")
         print("  python ssClient.py del target <索引> - 删除指定索引的目标股票")
+        print("  python ssClient.py enable target <索引> - 启用指定索引的目标股票")
+        print("  python ssClient.py disable target <索引> - 禁用指定索引的目标股票")
         print("  python ssClient.py market-context   - 显示市场数据")
         return
     
@@ -169,9 +192,47 @@ def main():
             print("可用的子命令: target")
     elif command == 'market-context':
         client.print_market_context()
+    elif command == 'enable':
+        if len(sys.argv) < 4:
+            print("错误: enable命令需要指定参数 (target <索引>")
+            return
+        sub_command = sys.argv[2]
+        if sub_command == 'target':
+            try:
+                index = int(sys.argv[3])
+                result = client.enable_target(index)
+                if result:
+                    if result.get('success'):
+                        print(f"成功: {result.get('message')}")
+                    else:
+                        print(f"失败: {result.get('message')}")
+            except ValueError:
+                print("错误: 索引必须是整数")
+        else:
+            print(f"错误: 未知的enable子命令: {sub_command}")
+            print("可用的子命令: target")
+    elif command == 'disable':
+        if len(sys.argv) < 4:
+            print("错误: disable命令需要指定参数 (target <索引>")
+            return
+        sub_command = sys.argv[2]
+        if sub_command == 'target':
+            try:
+                index = int(sys.argv[3])
+                result = client.disable_target(index)
+                if result:
+                    if result.get('success'):
+                        print(f"成功: {result.get('message')}")
+                    else:
+                        print(f"失败: {result.get('message')}")
+            except ValueError:
+                print("错误: 索引必须是整数")
+        else:
+            print(f"错误: 未知的disable子命令: {sub_command}")
+            print("可用的子命令: target")
     else:
         print(f"错误: 未知命令: {command}")
-        print("可用的命令: status, show, del, market-context")
+        print("可用的命令: status, show, del, enable, disable, market-context")
 
 if __name__ == "__main__":
     main()
