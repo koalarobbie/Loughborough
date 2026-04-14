@@ -14,3 +14,5 @@ class Target:
         self.ma30 = -1        # 30日均线价格
         self.buy_coef = 1.0   # 买入系数,买入阶梯价*买入系数为实际买入阶梯价
         self.enabled = 1      # 是否启用，1为启用，0为禁用
+        self.buy_order = 0    # 买入订单
+        self.sell_order = 0   # 卖出订单

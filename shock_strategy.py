@@ -266,7 +266,9 @@ class ShockStrategy:
                     'up_price': '{:.2f}'.format(target.up_price) if isinstance(target.up_price, (int, float)) else str(target.up_price),
                     'ma30': '{:.2f}'.format(target.ma30) if isinstance(target.ma30, (int, float)) else str(target.ma30),
                     'buy_coef': '{:.2f}'.format(target.buy_coef) if isinstance(target.buy_coef, (int, float)) else str(target.buy_coef),
-                    'enabled': str(target.enabled)
+                    'enabled': str(target.enabled),
+                    'buy_order': str(target.buy_order),
+                    'sell_order': str(target.sell_order)
                 }
                 targets_data.append(target_info)
             # 使用json.dumps序列化数据，然后返回Response对象
@@ -396,7 +398,42 @@ class ShockStrategy:
         else:
             logger.error(f"无效的目标股票索引: {index}")
             return False, None
-
+    
+    def UpdateTargetOrder(self, stock_code, order, type):
+        """更新目标股票的订单信息
+        
+        Args:
+            stock_code: 股票代码
+            order: 订单类型，xtconstant.STOCK_BUY代表买入，xtconstant.STOCK_SELL代表卖出
+            type: 操作类型，xtconstant.ORDER_REPORTED时buy_order或sell_order属性+1，xtconstant.ORDER_SUCCEEDED时buy_order或sell_order属性-1
+            
+        Returns:
+            dict: 包含成功状态和消息的字典
+        """
+        for target in self.targets:
+            if target.stock_code == stock_code:
+                if order == xtconstant.STOCK_BUY:
+                    if type == xtconstant.ORDER_REPORTED:
+                        target.buy_order += 1
+                        logger.info(f"更新目标股票 {stock_code} 的买入订单数为: {target.buy_order}")
+                    elif type == xtconstant.ORDER_SUCCEEDED or type == xtconstant.ORDER_CANCELED:
+                        target.buy_order = max(0, target.buy_order - 1)  # 确保不会小于0
+                        logger.info(f"更新目标股票 {stock_code} 的买入订单数为: {target.buy_order}")
+                    else:
+                        return {"success": False, "message": "无效的操作类型"}
+                elif order == xtconstant.STOCK_SELL:
+                    if type == xtconstant.ORDER_REPORTED:
+                        target.sell_order += 1
+                        logger.info(f"更新目标股票 {stock_code} 的卖出订单数为: {target.sell_order}")
+                    elif type == xtconstant.ORDER_SUCCEEDED or type == xtconstant.ORDER_CANCELED:
+                        target.sell_order = max(0, target.sell_order - 1)  # 确保不会小于0
+                        logger.info(f"更新目标股票 {stock_code} 的卖出订单数为: {target.sell_order}")
+                    else:
+                        return {"success": False, "message": "无效的操作类型"}
+                else:
+                    return {"success": False, "message": "无效的订单类型"}
+                return {"success": True, "message": f"成功更新目标股票 {stock_code} 的订单信息"}
+        return {"success": False, "message": f"未找到股票代码为 {stock_code} 的目标股票"}
 
     #策略运行
     def Run(self):
@@ -470,8 +507,10 @@ class ShockStrategy:
                         logger.info(f"委托推送,消息ID:{msg.msg_id},消息类型:{msg.order_type},股票代码:{msg.code},交易ID:{msg.order_id},交易价格:{msg.price},交易量:{msg.volume},状态:{msg.status},备注:{msg.remark}")
                         if msg.status == xtconstant.ORDER_REPORTED:
                             pass
+                            self.UpdateTargetOrder(msg.code, msg.order_type, xtconstant.ORDER_REPORTED)
                         if msg.status == xtconstant.ORDER_CANCELED:
                             ret = self.orders.Update_Status(msg.code,traderid2orderid(msg.order_id),msg.status,msg.order_type,msg.remark)
+                            self.UpdateTargetOrder(msg.code, msg.order_type, xtconstant.ORDER_CANCELED)
                             logger.info(f"委托撤单,消息ID:{msg.msg_id},消息类型:{msg.order_type},股票代码:{msg.code},交易ID:{msg.order_id},交易价格:{msg.price},交易量:{msg.volume},状态:{msg.status},备注:{msg.remark},状态更新返回:{ret}")
                     elif msg.msg_type == DONE_MSG:
                         logger.info(f"成交推送,消息ID:{msg.msg_id},消息类型:{msg.order_type},股票代码:{msg.code},交易ID:{msg.order_id},交易价格:{msg.price},交易量:{msg.volume},状态:{msg.status},备注:{msg.remark}")
@@ -491,7 +530,7 @@ class ShockStrategy:
                             elif msg.order_type == xtconstant.STOCK_SELL:
                                 trans_id = msg.remark
                                 self.transactions.loc[self.transactions['id'] == trans_id,'status'] =  1 
-                
+                            self.UpdateTargetOrder(msg.code, msg.order_type, xtconstant.ORDER_DONE)
                 if message_flag == 1:
                     self.transactions.to_sql("tansactions", self.conn, if_exists='replace',index=False)
                     self.orders.Dump()

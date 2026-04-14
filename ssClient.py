@@ -122,12 +122,12 @@ class SSClient:
         targets = self.get_targets()
         if targets:
             print("\n=== 目标股票列表 ===")
-            print(f"{'行号':<6} {'股票代码':<12} {'买入阶梯':<10} {'卖出阶梯':<10} {'数量':<8} {'策略ID':<8} {'地板价':<10} {'天花板价':<10} {'MA30':<10} {'买入系数':<10} {'启用':<6}")
-            print("-" * 120)
+            print(f"{'行号':<6} {'股票代码':<12} {'买入阶梯':<10} {'卖出阶梯':<10} {'数量':<8} {'策略ID':<8} {'地板价':<10} {'天花板价':<10} {'MA30':<10} {'买入系数':<10} {'启用':<6} {'买入订单':<8} {'卖出订单':<8}")
+            print("-" * 140)
             for i, target in enumerate(targets):
                 enabled_str = '是' if target.get('enabled', '1') == '1' else '否'
-                print(f"{i:<6} {target['stock_code']:<12} {target['buy_step']:<10} {target['sell_step']:<10} {target['vol']:<8} {target['policy']:<8} {target['down_price']:<10} {target['up_price']:<10} {target['ma30']:<10} {target['buy_coef']:<10} {enabled_str:<6}")
-            print("-" * 120)
+                print(f"{i:<6} {target['stock_code']:<12} {target['buy_step']:<10} {target['sell_step']:<10} {target['vol']:<8} {target['policy']:<8} {target['down_price']:<10} {target['up_price']:<10} {target['ma30']:<10} {target['buy_coef']:<10} {enabled_str:<6} {target.get('buy_order', '0'):<8} {target.get('sell_order', '0'):<8}")
+            print("-" * 140)
     
     def print_all(self):
         """打印所有信息"""
