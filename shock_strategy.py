@@ -32,7 +32,8 @@ ORDER_NONE  = 0
 ORDER_BUY = 1
 ORDER_SELL = 2
 
-
+STATE_NOTHING = 0
+STATE_PRETRADE = 570
 STATE_TRADE = 575
 STATE_CLOSING = 890
 STATE_CLOSING_DONE = 895
@@ -50,7 +51,7 @@ class ShockStrategy:
             from ssOrders import ssOrders, ssOrder
         self.trader = None
         self.conn = None
-        self.transactions = None
+        self.transactions = pd.DataFrame()
         self.mode = mode
         self.max_order = max_order
         self.targets = []
@@ -435,18 +436,15 @@ class ShockStrategy:
                 return {"success": True, "message": f"成功更新目标股票 {stock_code} 的订单信息"}
         return {"success": False, "message": f"未找到股票代码为 {stock_code} 的目标股票"}
 
-    #策略运行
-    def Run(self):
-        if self.trader == None:
-            print("未设置xttrader！")
-            return
-        
-        self.conn = create_engine(ShockStrategy.transaction_db)
-        if self.conn == None:
-            print("连接数据库失败！")
-            return
-        
-        
+
+    def PreTradeInit(self):
+        # 初始化交易前的状态，清空订单和交易记录
+        self.targets.clear()
+        self.transactions.drop(self.transactions.index, inplace=True)
+        self.orders.RemoveAll()
+        self.market_context.Remove_Target()
+
+        #
         #读取交易配置
         print("读取配置信息!")
         self.targets = self.ReadConfig()
@@ -455,6 +453,8 @@ class ShockStrategy:
         #    print(target.stock_code,target.buy_step,target.sell_step,target.vol,target.policy,target.down_price,target.up_price,target.ma30,target.enabled)
         self.orders.Init(self.targets)
         
+        self.market_context.Add_Target(self.targets)
+
 
         #获取开放交易数据
         self.transactions = pd.read_sql("tansactions", self.conn)
@@ -469,22 +469,66 @@ class ShockStrategy:
         if real_orders:
             for order in real_orders:
                 self.orders.Add(order.stock_code,ssOrder(traderid2orderid(order.order_id),order.order_type,order.stock_code,order.price,order.order_volume,order.order_status,order.order_remark))
-                                
+          
+
+    #策略运行
+    def Run(self):
+        if self.trader == None:
+            print("未设置xttrader！")
+            return
+        
+        self.conn = create_engine(ShockStrategy.transaction_db)
+        if self.conn == None:
+            print("连接数据库失败！")
+            return
+                                       
         order_time = 0 #买入交易次数
         print("###################自动交易开始，打印当前委托和交易情况：###################")
-        self.orders.Dump()
+        
         
         state = 0
         closing_done = 0
+        
+        self.PreTradeInit()
+        init_flag = 1
         while self._running:
             now = datetime.now()
             state =now.hour * 60 + now.minute
-            if state >= STATE_CLOSED:
-                break
-            if state < STATE_TRADE:
+            logger.info(f"当前时间: {now}, 当前状态: {state}, 初始化标志: {init_flag}, 尾盘处理完成标志: {closing_done}")
+
+            if state < STATE_PRETRADE:
+                time.sleep(60)
+                init_flag = 0
+                closing_done = 0
+                continue
+            elif state < STATE_TRADE and init_flag == 0:
+                self.PreTradeInit()
+                init_flag = 1
+                self.orders.Dump()
+                continue
+            elif state < STATE_TRADE and init_flag == 1: 
                 time.sleep(60)
                 continue
-
+            elif state >= STATE_CLOSING and state < STATE_CLOSED and closing_done == 0:        
+                #盘后处理
+                logger.info(f"执行尾盘撤单")
+                for target in self.targets:
+                    orders = self.orders.data[target.stock_code]
+                    for order in orders:
+                        if order.order_type == xtconstant.STOCK_BUY and order.status == xtconstant.ORDER_REPORTED:
+                            self.trader.cancel_order(orderid2traderid(order.order_id))
+                            logger.info(f"盘后撤销未成交买入委托,股票代码:{order.stock_code},交易ID:{orderid2traderid(order.order_id)},交易价格:{order.price},交易量:{order.volume},状态:{order.status},备注:{order.ref}")
+            
+                #盘后购买逆回购
+                time.sleep(10)
+                self.ReverseResponse()
+                closing_done = 1
+            elif state >= STATE_CLOSED:
+                self.market_context.Update_Context()
+                self.market_context.Dump_Context()
+                time.sleep(3600)
+                continue
+            
             try:     
                 if self.mode > MODE_NORMAL:
                     real_orders = self.trader.query_orders()
@@ -530,7 +574,7 @@ class ShockStrategy:
                             elif msg.order_type == xtconstant.STOCK_SELL:
                                 trans_id = msg.remark
                                 self.transactions.loc[self.transactions['id'] == trans_id,'status'] =  1 
-                            self.UpdateTargetOrder(msg.code, msg.order_type, xtconstant.ORDER_DONE)
+                            self.UpdateTargetOrder(msg.code, msg.order_type, xtconstant.ORDER_SUCCEEDED)
                 if message_flag == 1:
                     self.transactions.to_sql("tansactions", self.conn, if_exists='replace',index=False)
                     self.orders.Dump()
@@ -557,33 +601,19 @@ class ShockStrategy:
                                 order_id = self.trader.sell(target.stock_code,od.GetSellPrice(),target.vol,str(od.GetTranId()))
                                 if order_id is not None:
                                     self.orders.Add(target.stock_code,ssOrder(traderid2orderid(order_id),xtconstant.STOCK_SELL,target.stock_code,od.GetSellPrice(),target.vol,xtconstant.ORDER_REPORTED,od.GetTranId()))
-                        if od.GetSellCancelDecision():
+                        if od.GetSellCancelDecision() and target.sell_order > 1:
                             self.trader.cancel_order(orderid2traderid(od.GetSellCancelId()))
                             logger.info(f"撤销卖出委托,股票代码:{target.stock_code},交易ID:{orderid2traderid(od.GetSellCancelId())}")
-                        #if od.GetBuyCancelDecision():
-                        #    self.trader.cancel_order(int(od.GetBuyCancelId()))
-                        #    logger.info(f"撤销买入委托,股票代码:{target.stock_code},交易ID:{od.GetBuyCancelId()}")
-
+                        if od.GetBuyCancelDecision() and trader.buy_order > 1:
+                            self.trader.cancel_order(int(od.GetBuyCancelId()))
+                            logger.info(f"撤销买入委托,股票代码:{target.stock_code},交易ID:{od.GetBuyCancelId()}")
                 
                 time.sleep(60)
             except Exception as e:
                 logger.error(f"运行过程中发生异常: {str(e)}")
                 time.sleep(60)
 
-            if state >= STATE_CLOSING and closing_done == 0:        
-                #盘后处理
-                logger.info(f"执行尾盘撤单")
-                for target in self.targets:
-                    orders = self.orders.data[target.stock_code]
-                    for order in orders:
-                        if order.order_type == xtconstant.STOCK_BUY and order.status == xtconstant.ORDER_REPORTED:
-                            self.trader.cancel_order(orderid2traderid(order.order_id))
-                            logger.info(f"盘后撤销未成交买入委托,股票代码:{order.stock_code},交易ID:{orderid2traderid(order.order_id)},交易价格:{order.price},交易量:{order.volume},状态:{order.status},备注:{order.ref}")
-            
-                #盘后购买逆回购
-                time.sleep(10)
-                self.ReverseResponse()
-                closing_done = 1
+    
             
         self.orders.Dump()
 
